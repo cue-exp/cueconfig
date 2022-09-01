@@ -1,0 +1,31 @@
+go-config-demo
+cmp stdout stdout.golden
+
+-- .exampleconfig/config.cue --
+package example
+
+foo: 75
+bar: a: {
+	blah: "hello"
+	foobie: [1, 2, 3]
+}
+bar: b: {}
+
+-- stdout.golden --
+{
+	"foo": 75,
+	"bar": {
+		"a": {
+			"blah": "hello",
+			"foobie": [
+				1,
+				2,
+				3
+			]
+		},
+		"b": {
+			"blah": "something",
+			"foobie": []
+		}
+	}
+}

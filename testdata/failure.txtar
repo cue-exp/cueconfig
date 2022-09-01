@@ -1,0 +1,13 @@
+! go-config-demo
+cmpenv stderr stderr.golden
+
+-- .exampleconfig/config.cue --
+package example
+
+foo: 150
+
+-- stderr.golden --
+cannot load config from ".exampleconfig": foo: invalid value 150 (out of bound <100):
+    $$schema.cue:2:20
+    $WORK/.exampleconfig/config.cue:3:6
+
