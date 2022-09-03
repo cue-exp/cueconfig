@@ -20,7 +20,7 @@ var metaSchema string
 var (
 	pathConfig       = cue.MakePath(cue.Def("#Config"))
 	pathRuntime      = cue.MakePath(cue.Def("#Runtime"))
-	pathDefaults     = cue.MakePath(cue.Def("#Runtime"))
+	pathDefaults     = cue.MakePath(cue.Def("#Defaults"))
 	pathRuntimeField = cue.MakePath(cue.Str("runtime"))
 	pathConfigField  = cue.MakePath(cue.Str("config"))
 )
@@ -96,7 +96,7 @@ func Load(configFilePath string, schemaBytes []byte, runtime any, dest any) erro
 
 	schemaVal := ctx.CompileBytes(schemaBytes, cue.Filename("$schema.cue"))
 	if err := schemaVal.Err(); err != nil {
-		return fmt.Errorf("unexpected error in config schema: %v", errors.Details(err, nil))
+		return fmt.Errorf("unexpected error in config schema %q: %v", schemaBytes, errors.Details(err, nil))
 	}
 
 	// Unify the metaschema with the actual configuration schema.
@@ -115,7 +115,7 @@ func Load(configFilePath string, schemaBytes []byte, runtime any, dest any) erro
 	// they use won't conflict with defaults supplied by the program.
 	configVal, err = finalize(ctx, configVal)
 	if err != nil {
-		return fmt.Errorf("internal error: cannot finalize configuratiuon value: %v", err)
+		return fmt.Errorf("internal error: cannot finalize configuratiuon value: %v", errors.Details(err, nil))
 	}
 
 	// Get the #Defaults definition.
@@ -130,13 +130,13 @@ func Load(configFilePath string, schemaBytes []byte, runtime any, dest any) erro
 	// Unify the #Defaults.config field with the finalized configuration.
 	defaults = defaults.FillPath(pathConfigField, configVal)
 	if err := defaults.Validate(cue.All()); err != nil {
-		return fmt.Errorf("cannot fill in defaults: %v", err)
+		return fmt.Errorf("cannot fill in defaults: %v", errors.Details(err, nil))
 	}
 
 	// Read out the final configuration value with all defaults applied.
 	configVal = defaults.LookupPath(pathConfigField)
 	if err := configVal.Decode(dest); err != nil {
-		return fmt.Errorf("cannot decode final configuration: %v", err)
+		return fmt.Errorf("cannot decode final configuration: %v", errors.Details(err, nil))
 	}
 	return nil
 }

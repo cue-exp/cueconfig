@@ -1,4 +1,4 @@
-go-config-demo
+cueconfig-test
 cmp stdout stdout.golden
 
 -- .exampleconfig/config.cue --
@@ -24,7 +24,7 @@ bar: b: {}
 			]
 		},
 		"b": {
-			"blah": "something",
+			"blah": "default value",
 			"foobie": []
 		}
 	}
