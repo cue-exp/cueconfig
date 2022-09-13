@@ -1,0 +1,40 @@
+env FOO=hello
+cueconfig-test
+cmp stdout stdout.golden
+
+-- .exampleconfig/config.cue --
+package example
+
+runtime: _
+
+foo: 75
+
+_#Bar: {
+	blah: *runtime.env.FOO | _
+	...
+}
+
+bar: [_]: _#Bar
+bar: a: {
+	foobie: [1, 2, 3]
+}
+bar: b: {}
+
+-- stdout.golden --
+{
+	"foo": 75,
+	"bar": {
+		"a": {
+			"blah": "hello",
+			"foobie": [
+				1,
+				2,
+				3
+			]
+		},
+		"b": {
+			"blah": "hello",
+			"foobie": []
+		}
+	}
+}

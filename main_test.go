@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rogpeppe/cueconfig"
@@ -38,12 +39,24 @@ type Baz struct {
 }
 
 func Main() int {
+	runtime := struct {
+		Env map[string]string `json:"env"`
+	}{environ()}
 	var cfg config
-	if err := cueconfig.Load(".exampleconfig", schema, nil, &cfg); err != nil {
+	if err := cueconfig.Load(".exampleconfig", schema, runtime, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}
 	data, _ := json.MarshalIndent(cfg, "", "\t")
 	fmt.Printf("%s\n", data)
 	return 0
+}
+
+func environ() map[string]string {
+	m := make(map[string]string)
+	for _, e := range os.Environ() {
+		k, v, _ := strings.Cut(e, "=")
+		m[k] = v
+	}
+	return m
 }

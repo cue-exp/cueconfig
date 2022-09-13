@@ -1,4 +1,5 @@
 #Config: {
+	runtime: #Runtime
 	foo: int & >= 0 & <100
 	bar: [string]: #Baz
 }
@@ -9,9 +10,7 @@
 	foobie: [...int]
 }
 
-#Runtime: {
-	env: [_]: string
-}
+#Runtime: env: [_]: string
 
 #Defaults: {
 	runtime: #Runtime

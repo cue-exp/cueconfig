@@ -41,13 +41,16 @@ var (
 //	// in their configuration file. It should be a pure schema with no defaults.
 //	// Note that the default is to allow any configuration at all.
 //	#Config: {
+//		// runtime supplies any runtime values available to the configuration.
+//		// This is intended to be filled in by the implementation, not the user.
+//		runtime?: #Runtime
 //		...
 //	}
 //
 //	// #Runtime holds runtime values that will be mixed into the configuration
 //	// in addition to the user-specified configuration. Examples might
 //	// be environment variables or the current working directory.
-//	#Runtime: _
+//	#Runtime: {...}
 //
 //	// #Defaults holds any program-defined default values
 //	// for the configuration. Any defaults supplied by the user's
@@ -101,6 +104,12 @@ func Load(configFilePath string, schemaBytes []byte, runtime any, dest any) erro
 	schemaVal = schemaVal.Unify(metaSchemaVal)
 	if err := schemaVal.Validate(cue.All()); err != nil {
 		return fmt.Errorf("config schema conflict: %v", errors.Details(err, nil))
+	}
+
+	// Unify the schema with the runtime-provided values.
+	configVal = configVal.FillPath(pathRuntimeField, runtime)
+	if err := configVal.Validate(cue.All()); err != nil {
+		return fmt.Errorf("config schema conflict on runtime values: %v", errors.Details(err, nil))
 	}
 
 	// Unify the schema with the user-provided config.
