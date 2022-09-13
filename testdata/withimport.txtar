@@ -1,0 +1,68 @@
+cueconfig-test
+cmp stdout stdout.golden
+
+-- .exampleconfig/cue.mod/module.cue --
+module: "example.com/example"
+
+-- .exampleconfig/cue.mod/pkg/example.com/cueconfigtest/schema.cue --
+package cueconfigtest
+
+#Config: {
+	foo: int & >= 0 & <100
+	bar: [string]: #Baz
+}
+
+#Baz: {
+	name: string
+	blah: string
+	foobie: [...int]
+}
+
+#Defaults: {
+	config: {
+		foo: *1 | _
+		bar: [n=_]: {
+			name: n
+			blah: *"default value" | _
+		}
+	}
+}
+
+-- .exampleconfig/config.cue --
+package example
+
+import "example.com/cueconfigtest"
+
+cueconfigtest.#Config
+
+foo: 75
+
+_#Bar: {
+	blah: *"hello" | _
+	...
+}
+
+bar: [_]: _#Bar
+bar: a: {
+	foobie: [1, 2, 3]
+}
+bar: b: {}
+
+-- stdout.golden --
+{
+	"foo": 75,
+	"bar": {
+		"a": {
+			"blah": "hello",
+			"foobie": [
+				1,
+				2,
+				3
+			]
+		},
+		"b": {
+			"blah": "hello",
+			"foobie": []
+		}
+	}
+}

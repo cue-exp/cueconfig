@@ -9,12 +9,17 @@
 	foobie: [...int]
 }
 
+#Runtime: {
+	env: [_]: string
+}
+
 #Defaults: {
+	runtime: #Runtime
 	config: {
 		foo: *1 | _
 		bar: [n=_]: {
 			name: n
-			blah: *"default value" | _
+			blah: *runtime.env.SOMEVAR | _
 		}
 	}
 }

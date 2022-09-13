@@ -5,8 +5,14 @@ cmp stdout stdout.golden
 package example
 
 foo: 75
+
+_#Bar: {
+	blah: *"hello" | _
+	...
+}
+
+bar: [_]: _#Bar
 bar: a: {
-	blah: "hello"
 	foobie: [1, 2, 3]
 }
 bar: b: {}
@@ -24,7 +30,7 @@ bar: b: {}
 			]
 		},
 		"b": {
-			"blah": "default value",
+			"blah": "hello",
 			"foobie": []
 		}
 	}

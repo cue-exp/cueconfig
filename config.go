@@ -47,9 +47,7 @@ var (
 //	// #Runtime holds runtime values that will be mixed into the configuration
 //	// in addition to the user-specified configuration. Examples might
 //	// be environment variables or the current working directory.
-//	#Runtime: {
-//		...
-//	}
+//	#Runtime: _
 //
 //	// #Defaults holds any program-defined default values
 //	// for the configuration. Any defaults supplied by the user's

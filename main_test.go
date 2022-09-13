@@ -18,6 +18,12 @@ func TestFoo(t *testing.T) {
 	})
 }
 
+func TestMain(m *testing.M) {
+	os.Exit(testscript.RunMain(m, map[string]func() int{
+		"cueconfig-test": Main,
+	}))
+}
+
 //go:embed testschema.cue
 var schema []byte
 
@@ -29,12 +35,6 @@ type config struct {
 type Baz struct {
 	Blah   string `json:"blah"`
 	Foobie []int  `json:"foobie"`
-}
-
-func TestMain(m *testing.M) {
-	os.Exit(testscript.RunMain(m, map[string]func() int{
-		"cueconfig-test": Main,
-	}))
 }
 
 func Main() int {
