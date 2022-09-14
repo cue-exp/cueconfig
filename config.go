@@ -14,60 +14,28 @@ import (
 	"cuelang.org/go/cue/load"
 )
 
-//go:embed metaschema.cue
-var metaSchema string
-
-var (
-	pathConfig       = cue.MakePath(cue.Def("#Config"))
-	pathRuntime      = cue.MakePath(cue.Def("#Runtime"))
-	pathDefaults     = cue.MakePath(cue.Def("#Defaults"))
-	pathRuntimeField = cue.MakePath(cue.Str("runtime"))
-	pathConfigField  = cue.MakePath(cue.Str("config"))
-)
+var pathRuntime = cue.MakePath(cue.Str("runtime"))
 
 // Load loads the CUE configuration at the file or CUE package directory
 // configFilePath. If the file does not exist, os.IsNotExist error is returned.
 //
-// The schema for the user configuration is given in schemaBytes.
+// The schema for the user configuration is given in schema.
 // Usually this will come from a CUE file embedded in the binary by the caller.
 // If it's empty then any configuration data will be allowed.
 //
+// The user configuration is first read and unified with the schema.
+// Then if runtime is non-nil, it is used to fill in the field "runtime",
+// thus providing the user configuration with any desired runtime values (e.g.
+// environment variables).
+//
+// Then the result is finalised (which applies any user-specified defaults), then
+// unified with the CUE contained in the defaults argument.
+// This allows the program to specify default values independently
+// from the user.
+//
 // The result is unmarshaled into the Go value pointed to by dest
 // using cue.Value.Decode (similar to json.Unmarshal).
-//
-// The schema must conform to the following meta-schema:
-//
-//	// #Config defines the configuration schema that the user must specify
-//	// in their configuration file. It should be a pure schema with no defaults.
-//	// Note that the default is to allow any configuration at all.
-//	#Config: {
-//		// runtime supplies any runtime values available to the configuration.
-//		// This is intended to be filled in by the implementation, not the user.
-//		runtime?: #Runtime
-//		...
-//	}
-//
-//	// #Runtime holds runtime values that will be mixed into the configuration
-//	// in addition to the user-specified configuration. Examples might
-//	// be environment variables or the current working directory.
-//	#Runtime: {...}
-//
-//	// #Defaults holds any program-defined default values
-//	// for the configuration. Any defaults supplied by the user's
-//	// configuration will have been resolved before this is
-//	// applied.
-//	//
-//	// Note that if this is not supplied, there will be no program-defined
-//	// defaults filled in by Load.
-//	#Defaults: {
-//		// runtime holds any values supplied as part of the runtime
-//		// parameter to Load.
-//		runtime: #Runtime
-//		// config should define any default values, possibly in terms
-//		// of the runtime values.
-//		config: #Config
-//	}
-func Load(configFilePath string, schemaBytes []byte, runtime any, dest any) error {
+func Load(configFilePath string, schema, defaults []byte, runtime any, dest any) error {
 	info, err := os.Stat(configFilePath)
 	if err != nil {
 		return err
@@ -90,58 +58,43 @@ func Load(configFilePath string, schemaBytes []byte, runtime any, dest any) erro
 		return fmt.Errorf("invalid configuration from %q: %v", configFilePath, errors.Details(err, nil))
 	}
 
-	metaSchemaVal := ctx.CompileString(metaSchema, cue.Filename("$metaschema.cue"))
-	if err := metaSchemaVal.Err(); err != nil {
-		panic(fmt.Errorf("unexpected error in meta schema: %v", errors.Details(err, nil)))
-	}
-
-	schemaVal := ctx.CompileBytes(schemaBytes, cue.Filename("$schema.cue"))
+	// Compile the config schema.
+	schemaVal := ctx.CompileBytes(schema, cue.Filename("$schema.cue"))
 	if err := schemaVal.Err(); err != nil {
-		return fmt.Errorf("unexpected error in config schema %q: %v", schemaBytes, errors.Details(err, nil))
+		return fmt.Errorf("unexpected error in configuration schema %q: %v", schema, errors.Details(err, nil))
+	}
+	// Compile the defaults.
+	defaultsVal := ctx.CompileBytes(defaults, cue.Filename("$defaults.cue"))
+	if err := schemaVal.Err(); err != nil {
+		return fmt.Errorf("unexpected error in defaults %q: %v", defaults, errors.Details(err, nil))
 	}
 
-	// Unify the metaschema with the actual configuration schema.
-	schemaVal = schemaVal.Unify(metaSchemaVal)
-	if err := schemaVal.Validate(cue.All()); err != nil {
-		return fmt.Errorf("config schema conflict: %v", errors.Details(err, nil))
-	}
-
-	// Unify the schema with the runtime-provided values.
-	configVal = configVal.FillPath(pathRuntimeField, runtime)
+	// Unify the user-provided config with the configuration schema.
+	configVal = configVal.Unify(schemaVal)
 	if err := configVal.Validate(cue.All()); err != nil {
-		return fmt.Errorf("config schema conflict on runtime values: %v", errors.Details(err, nil))
+		return fmt.Errorf("error in configuration: %v", errors.Details(err, nil))
 	}
 
-	// Unify the schema with the user-provided config.
-	configVal = configVal.Unify(schemaVal.LookupPath(pathConfig))
-	if err := configVal.Validate(cue.All()); err != nil {
-		return fmt.Errorf("error(s) in configuration: %v", errors.Details(err, nil))
+	// If there's a runtime value provided, unify it with the runtime field.
+	if runtime != nil {
+		configVal = configVal.FillPath(pathRuntime, runtime)
+		if err := configVal.Validate(cue.All()); err != nil {
+			return fmt.Errorf("config schema conflict on runtime values: %v", errors.Details(err, nil))
+		}
 	}
 
-	// finalize the configuration as supplied by the user, so that any defaults
-	// they use won't conflict with defaults supplied by the program.
+	// The user layer is now complete. Now finalize it and apply any program-level
+	// defaults.
 	configVal, err = finalize(ctx, configVal)
 	if err != nil {
-		return fmt.Errorf("internal error: cannot finalize configuratiuon value: %v", errors.Details(err, nil))
+		return fmt.Errorf("internal error: cannot finalize configuration value: %v", errors.Details(err, nil))
+	}
+	// Unify with the defaults.
+	configVal = configVal.Unify(defaultsVal)
+	if err := configVal.Validate(cue.All()); err != nil {
+		return fmt.Errorf("config schema error applying program-level defaults: %v", errors.Details(err, nil))
 	}
 
-	// Get the #Defaults definition.
-	defaults := schemaVal.LookupPath(pathDefaults)
-
-	// Fill in the runtime field with the actual runtime values.
-	defaults = defaults.FillPath(pathRuntimeField, runtime)
-	if err := defaults.Validate(cue.All()); err != nil {
-		return fmt.Errorf("error in program-supplied runtime values: %v", err)
-	}
-
-	// Unify the #Defaults.config field with the finalized configuration.
-	defaults = defaults.FillPath(pathConfigField, configVal)
-	if err := defaults.Validate(cue.All()); err != nil {
-		return fmt.Errorf("cannot fill in defaults: %v", errors.Details(err, nil))
-	}
-
-	// Read out the final configuration value with all defaults applied.
-	configVal = defaults.LookupPath(pathConfigField)
 	if err := configVal.Decode(dest); err != nil {
 		return fmt.Errorf("cannot decode final configuration: %v", errors.Details(err, nil))
 	}

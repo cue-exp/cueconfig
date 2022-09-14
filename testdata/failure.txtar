@@ -7,7 +7,7 @@ package example
 foo: 150
 
 -- stderr.golden --
-error(s) in configuration: foo: invalid value 150 (out of bound <100):
-    $$schema.cue:3:20
+error in configuration: foo: invalid value 150 (out of bound <100):
+    $$schema.cue:1:19
     $WORK/.exampleconfig/config.cue:3:6
 

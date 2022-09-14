@@ -28,6 +28,9 @@ func TestMain(m *testing.M) {
 //go:embed testschema.cue
 var schema []byte
 
+//go:embed testdefaults.cue
+var defaults []byte
+
 type config struct {
 	Foo int            `json:"foo"`
 	Bar map[string]Baz `json:"bar"`
@@ -43,7 +46,7 @@ func Main() int {
 		Env map[string]string `json:"env"`
 	}{environ()}
 	var cfg config
-	if err := cueconfig.Load(".exampleconfig", schema, runtime, &cfg); err != nil {
+	if err := cueconfig.Load(".exampleconfig", schema, defaults, runtime, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}
