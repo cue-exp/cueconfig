@@ -8,4 +8,4 @@ It provides a single entry point, [Load](https://pkg.go.dev/github.com/cue-exp/c
 
 Optionally, `Load` can be provided with a CUE schema to verify the configuration before unmarshaling into the Go value, a set of default values to apply after any user-specified defaults, and some runtime-defined values to be made available to the configuration.
 
-There are [examples](xxx) in the package documentation.
+There is a [full example](https://pkg.go.dev/github.com/cue-exp/cueconfig#example-Load) in the package documentation.
