@@ -42,11 +42,15 @@ type Baz struct {
 }
 
 func Main() int {
+	configFile := ".exampleconfig"
+	if len(os.Args) > 1 {
+		configFile = os.Args[1]
+	}
 	runtime := struct {
 		Env map[string]string `json:"env"`
 	}{environ()}
 	var cfg config
-	if err := cueconfig.Load(".exampleconfig", schema, defaults, runtime, &cfg); err != nil {
+	if err := cueconfig.Load(configFile, schema, defaults, runtime, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}

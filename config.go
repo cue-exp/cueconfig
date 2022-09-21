@@ -1,3 +1,6 @@
+// Package `cueconfig` provides an API designed to make it straightforward
+// to use the CUE language (see https://cuelang.org) as a configuration format
+// for Go programs.
 package cueconfig
 
 import (
