@@ -5,12 +5,12 @@ cmp stdout stdout.golden
 -- .exampleconfig/config.cue --
 package example
 
-runtime: _
+env: _
 
 foo: 75
 
 _#Bar: {
-	blah: *runtime.env.FOO | _
+	blah: *env.FOO | _
 	...
 }
 

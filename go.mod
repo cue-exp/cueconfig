@@ -1,4 +1,4 @@
-module github.com/rogpeppe/cueconfig
+module github.com/cue-exp/cueconfig
 
 go 1.19
 

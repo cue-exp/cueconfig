@@ -14,21 +14,19 @@ import (
 	"cuelang.org/go/cue/load"
 )
 
-var pathRuntime = cue.MakePath(cue.Str("runtime"))
-
 // Load loads the CUE configuration at the file or CUE package directory
-// configFilePath. If the file does not exist, os.IsNotExist error is returned.
+// configFilePath. If the file does not exist, an os.IsNotExist error is returned.
 //
 // The schema for the user configuration is given in schema.
 // Usually this will come from a CUE file embedded in the binary by the caller.
 // If it's empty then any configuration data will be allowed.
 //
 // The user configuration is first read and unified with the schema.
-// Then if runtime is non-nil, it is used to fill in the field "runtime",
+// Then if runtime is non-nil, it is unified with the resulting value,
 // thus providing the user configuration with any desired runtime values (e.g.
 // environment variables).
 //
-// Then the result is finalised (which applies any user-specified defaults), then
+// Then the result is finalised (applying any user-specified defaults), then
 // unified with the CUE contained in the defaults argument.
 // This allows the program to specify default values independently
 // from the user.
@@ -77,7 +75,7 @@ func Load(configFilePath string, schema, defaults []byte, runtime any, dest any)
 
 	// If there's a runtime value provided, unify it with the runtime field.
 	if runtime != nil {
-		configVal = configVal.FillPath(pathRuntime, runtime)
+		configVal = configVal.Unify(ctx.Encode(runtime))
 		if err := configVal.Validate(cue.All()); err != nil {
 			return fmt.Errorf("config schema conflict on runtime values: %v", errors.Details(err, nil))
 		}
@@ -105,7 +103,7 @@ func Load(configFilePath string, schema, defaults []byte, runtime any, dest any)
 // This is a bit of a hack until similar functionality is implemented inside
 // the cue package itself.
 func finalize(ctx *cue.Context, v cue.Value) (cue.Value, error) {
-	n := v.Syntax(cue.Final(), cue.ResolveReferences(true), cue.DisallowCycles(true))
+	n := v.Syntax(cue.Final())
 	var f *ast.File
 	switch n := n.(type) {
 	case *ast.File:

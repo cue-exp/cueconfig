@@ -8,4 +8,4 @@ bar: [string]: #Baz
 }
 
 // This will be provided by the program, not the user.
-runtime: env: [_]: string
+env: [_]: string
