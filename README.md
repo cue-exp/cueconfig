@@ -9,3 +9,9 @@ It provides a single entry point, [Load](https://pkg.go.dev/github.com/cue-exp/c
 Optionally, `Load` can be provided with a CUE schema to verify the configuration before unmarshaling into the Go value, a set of default values to apply after any user-specified defaults, and some runtime-defined values to be made available to the configuration.
 
 There is a [full example](https://pkg.go.dev/github.com/cue-exp/cueconfig#example-Load) in the package documentation.
+
+### Issue tracking
+
+Please raise all issues in [the main CUE
+repository](https://github.com/cue-lang/cue/issues), giving the title of the
+issue a `cueconfig: ` prefix.
