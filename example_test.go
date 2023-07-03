@@ -1,11 +1,15 @@
 package cueconfig_test
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 
 	"github.com/cue-exp/cueconfig"
 )
+
+//go:embed example.cue
+var exampleFS embed.FS
 
 type exampleConfig struct {
 	Foo int                    `json:"foo"`
@@ -40,6 +44,44 @@ func ExampleLoad() {
 	// Load the configuration into the Go value cfg.
 	var cfg exampleConfig
 	if err := cueconfig.Load(configFile, exampleSchema, exampleDefaults, runtime, &cfg); err != nil {
+		fmt.Printf("%v\n", err)
+		return
+	}
+	// This is a placeholder for anything that the program might actually do
+	// with the configuration.
+	data, _ := json.MarshalIndent(cfg, "", "\t")
+	fmt.Printf("%s\n", data)
+	//Output:
+	//{
+	//	"foo": 1,
+	//	"bar": {
+	//		"a": {
+	//			"amount": 1.5,
+	//			"something": false,
+	//			"path": "/path/to/current/directory"
+	//		}
+	//	}
+	//}
+}
+
+func ExampleLoadFS() {
+	// In this example, we use the embeded example.cue
+	// but in practice this would be located whereever you'd want
+	// your program's configuration file.
+	configFile := "example.cue"
+
+	// This is a placeholder for any runtime values provided
+	// as input to the configuration.
+	runtime := struct {
+		Runtime exampleRuntime `json:"runtime"`
+	}{
+		Runtime: exampleRuntime{
+			CurrentDirectory: "/path/to/current/directory",
+		},
+	}
+	// Load the configuration into the Go value cfg.
+	var cfg exampleConfig
+	if err := cueconfig.LoadFS(exampleFS, configFile, exampleSchema, exampleDefaults, runtime, &cfg); err != nil {
 		fmt.Printf("%v\n", err)
 		return
 	}
