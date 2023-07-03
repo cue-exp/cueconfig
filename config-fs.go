@@ -13,7 +13,10 @@ import (
 
 func getOverlay(fsys fs.FS) (map[string]load.Source, error) {
 	overlay := map[string]load.Source{}
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return overlay, err
+	}
 	if err := fs.WalkDir(
 		fsys, ".",
 		func(filename string, entry fs.DirEntry, err error) error {
