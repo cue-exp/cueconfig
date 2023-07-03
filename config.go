@@ -6,6 +6,7 @@ package cueconfig
 import (
 	_ "embed"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"cuelang.org/go/cue"
@@ -37,17 +38,29 @@ import (
 // The result is unmarshaled into the Go value pointed to by dest
 // using cue.Value.Decode (similar to json.Unmarshal).
 func Load(configFilePath string, schema, defaults []byte, runtime any, dest any) error {
-	info, err := os.Stat(configFilePath)
+	return LoadFS(os.DirFS("."), configFilePath, schema, defaults, runtime, dest)
+}
+
+// LoadFS loads the CUE configuration from a given fs.FS, see Load
+func LoadFS(fsys fs.FS, configFilePath string, schema, defaults []byte, runtime any, dest any) error {
+	info, err := fs.Stat(fsys, configFilePath)
+	if err != nil {
+		return err
+	}
+	overlay, err := getOverlay(fsys)
 	if err != nil {
 		return err
 	}
 	var configInst *build.Instance
 	if info.IsDir() {
 		configInst = load.Instances([]string{"."}, &load.Config{
-			Dir: configFilePath,
+			Dir:     configFilePath,
+			Overlay: overlay,
 		})[0]
 	} else {
-		configInst = load.Instances([]string{configFilePath}, nil)[0]
+		configInst = load.Instances([]string{configFilePath}, &load.Config{
+			Overlay: overlay,
+		})[0]
 	}
 	if err := configInst.Err; err != nil {
 		return fmt.Errorf("cannot load configuration from %q: %v", configFilePath, err)
