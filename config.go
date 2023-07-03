@@ -41,7 +41,7 @@ func Load(configFilePath string, schema, defaults []byte, runtime any, dest any)
 	return LoadFS(os.DirFS("."), configFilePath, schema, defaults, runtime, dest)
 }
 
-// LoadFS loads the CUE configuration from a given fs.FS, see Load
+// LoadFS loads the CUE configuration from a given fs.FS, for everything else, see Load
 func LoadFS(fsys fs.FS, configFilePath string, schema, defaults []byte, runtime any, dest any) error {
 	info, err := fs.Stat(fsys, configFilePath)
 	if err != nil {
