@@ -66,7 +66,7 @@ func Load(configFilePath string, schema, defaults []byte, runtime any, dest any)
 	}
 	// Compile the defaults.
 	defaultsVal := ctx.CompileBytes(defaults, cue.Filename("$defaults.cue"))
-	if err := schemaVal.Err(); err != nil {
+	if err := defaultsVal.Err(); err != nil {
 		return fmt.Errorf("unexpected error in defaults %q: %v", defaults, errors.Details(err, nil))
 	}
 
