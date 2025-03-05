@@ -20,9 +20,9 @@ func TestFoo(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	os.Exit(testscript.RunMain(m, map[string]func() int{
+	testscript.Main(m, map[string]func(){
 		"cueconfig-test": Main,
-	}))
+	})
 }
 
 //go:embed testschema.cue
@@ -41,7 +41,7 @@ type Baz struct {
 	Foobie []int  `json:"foobie"`
 }
 
-func Main() int {
+func Main() {
 	configFile := ".exampleconfig"
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
@@ -52,11 +52,10 @@ func Main() int {
 	var cfg config
 	if err := cueconfig.Load(configFile, schema, defaults, runtime, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return 1
+		os.Exit(1)
 	}
 	data, _ := json.MarshalIndent(cfg, "", "\t")
 	fmt.Printf("%s\n", data)
-	return 0
 }
 
 func environ() map[string]string {
