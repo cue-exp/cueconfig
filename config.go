@@ -6,6 +6,7 @@ package cueconfig
 import (
 	_ "embed"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"cuelang.org/go/cue"
@@ -41,13 +42,29 @@ func Load(configFilePath string, schema, defaults []byte, runtime any, dest any)
 	if err != nil {
 		return err
 	}
+	return loadInstance(&load.Config{}, configFilePath, info, schema, defaults, runtime, dest)
+}
+
+// LoadFS is like [Load] but reads the configuration from fsys, such as an
+// [embed.FS], rather than from the host operating system filesystem.
+// configFilePath is a forward-slash-separated path within fsys.
+func LoadFS(fsys fs.FS, configFilePath string, schema, defaults []byte, runtime any, dest any) error {
+	info, err := fs.Stat(fsys, configFilePath)
+	if err != nil {
+		return err
+	}
+	return loadInstance(&load.Config{FS: fsys}, configFilePath, info, schema, defaults, runtime, dest)
+}
+
+// loadInstance holds the logic shared by [Load] and [LoadFS]; cfg carries the
+// filesystem selection, if any.
+func loadInstance(cfg *load.Config, configFilePath string, info fs.FileInfo, schema, defaults []byte, runtime any, dest any) error {
 	var configInst *build.Instance
 	if info.IsDir() {
-		configInst = load.Instances([]string{"."}, &load.Config{
-			Dir: configFilePath,
-		})[0]
+		cfg.Dir = configFilePath
+		configInst = load.Instances([]string{"."}, cfg)[0]
 	} else {
-		configInst = load.Instances([]string{configFilePath}, nil)[0]
+		configInst = load.Instances([]string{configFilePath}, cfg)[0]
 	}
 	if err := configInst.Err; err != nil {
 		return fmt.Errorf("cannot load configuration from %q: %v", configFilePath, err)
@@ -86,7 +103,7 @@ func Load(configFilePath string, schema, defaults []byte, runtime any, dest any)
 
 	// The user layer is now complete. Now finalize it and apply any program-level
 	// defaults.
-	configVal, err = finalize(ctx, configVal)
+	configVal, err := finalize(ctx, configVal)
 	if err != nil {
 		return fmt.Errorf("internal error: cannot finalize configuration value: %v", errors.Details(err, nil))
 	}

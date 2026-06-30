@@ -3,6 +3,7 @@ package cueconfig_test
 import (
 	"encoding/json"
 	"fmt"
+	"testing/fstest"
 
 	"github.com/cue-exp/cueconfig"
 )
@@ -45,19 +46,61 @@ func ExampleLoad() {
 	}
 	// This is a placeholder for anything that the program might actually do
 	// with the configuration.
-	data, _ := json.MarshalIndent(cfg, "", "\t")
+	data, _ := json.MarshalIndent(cfg, "", "  ")
 	fmt.Printf("%s\n", data)
-	//Output:
-	//{
-	//	"foo": 1,
-	//	"bar": {
-	//		"a": {
-	//			"amount": 1.5,
-	//			"something": false,
-	//			"path": "/path/to/current/directory"
-	//		}
-	//	}
-	//}
+	// Output:
+	// {
+	//   "foo": 1,
+	//   "bar": {
+	//     "a": {
+	//       "amount": 1.5,
+	//       "something": false,
+	//       "path": "/path/to/current/directory"
+	//     }
+	//   }
+	// }
+}
+
+func ExampleLoadFS() {
+	// Here the configuration lives in an in-memory filesystem rather than
+	// on disk. In practice fsys might be an embed.FS or any other io/fs.FS.
+	fsys := fstest.MapFS{
+		"example.cue": &fstest.MapFile{Data: []byte(`
+			foo: 1
+			bar: a: {}
+		`)},
+	}
+
+	// This is a placeholder for any runtime values provided
+	// as input to the configuration.
+	runtime := struct {
+		Runtime exampleRuntime `json:"runtime"`
+	}{
+		Runtime: exampleRuntime{
+			CurrentDirectory: "/path/to/current/directory",
+		},
+	}
+	// Load the configuration into the Go value cfg.
+	var cfg exampleConfig
+	if err := cueconfig.LoadFS(fsys, "example.cue", exampleSchema, exampleDefaults, runtime, &cfg); err != nil {
+		fmt.Printf("%v\n", err)
+		return
+	}
+	// This is a placeholder for anything that the program might actually do
+	// with the configuration.
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	fmt.Printf("%s\n", data)
+	// Output:
+	// {
+	//   "foo": 1,
+	//   "bar": {
+	//     "a": {
+	//       "amount": 1.5,
+	//       "something": false,
+	//       "path": "/path/to/current/directory"
+	//     }
+	//   }
+	// }
 }
 
 // exampleSchema holds the schema for the program's configuration.
