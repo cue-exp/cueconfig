@@ -3,10 +3,15 @@ package cueconfig_test
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/cue-exp/cueconfig"
 	"github.com/rogpeppe/go-internal/testscript"
@@ -23,6 +28,45 @@ func TestMain(m *testing.M) {
 	testscript.Main(m, map[string]func(){
 		"cueconfig-test": Main,
 	})
+}
+
+func TestMissingConfig(t *testing.T) {
+	// A configuration file which does not exist gives a not-exist error,
+	// but dest should still be filled with the defaults.
+	missing := filepath.Join(t.TempDir(), "missing.cue")
+	tests := []struct {
+		name string
+		load func(defaults []byte, dest any) error
+	}{
+		{"Load", func(defaults []byte, dest any) error {
+			return cueconfig.Load(missing, schema, defaults, nil, dest)
+		}},
+		{"LoadFS", func(defaults []byte, dest any) error {
+			return cueconfig.LoadFS(fstest.MapFS{}, "missing.cue", schema, defaults, nil, dest)
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var cfg config
+			err := test.load(defaults, &cfg)
+			if !errors.Is(err, fs.ErrNotExist) {
+				t.Fatalf("got error %v, want a not-exist error", err)
+			}
+			// TODO: dest should be filled with the defaults, but is left untouched.
+			want := config{}
+			if !reflect.DeepEqual(cfg, want) {
+				t.Errorf("got %#v, want %#v", cfg, want)
+			}
+
+			// If applying the defaults fails, that error should be returned instead,
+			// still mentioning the missing file.
+			// TODO: the defaults are not applied, so the not-exist error is returned.
+			err = test.load([]byte("foo: 200"), &cfg)
+			if !errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "missing.cue") {
+				t.Fatalf("got error %v, want a not-exist error", err)
+			}
+		})
+	}
 }
 
 //go:embed testschema.cue
