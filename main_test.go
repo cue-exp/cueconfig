@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 
 func TestMissingConfig(t *testing.T) {
 	// A configuration file which does not exist gives a not-exist error,
-	// but dest should still be filled with the defaults.
+	// but dest is still filled with the defaults.
 	missing := filepath.Join(t.TempDir(), "missing.cue")
 	tests := []struct {
 		name string
@@ -52,18 +52,16 @@ func TestMissingConfig(t *testing.T) {
 			if !errors.Is(err, fs.ErrNotExist) {
 				t.Fatalf("got error %v, want a not-exist error", err)
 			}
-			// TODO: dest should be filled with the defaults, but is left untouched.
-			want := config{}
+			want := config{Foo: 1, Bar: map[string]Baz{}}
 			if !reflect.DeepEqual(cfg, want) {
 				t.Errorf("got %#v, want %#v", cfg, want)
 			}
 
-			// If applying the defaults fails, that error should be returned instead,
+			// If applying the defaults fails, that error is returned instead,
 			// still mentioning the missing file.
-			// TODO: the defaults are not applied, so the not-exist error is returned.
 			err = test.load([]byte("foo: 200"), &cfg)
-			if !errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "missing.cue") {
-				t.Fatalf("got error %v, want a not-exist error", err)
+			if err == nil || errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "missing.cue") {
+				t.Fatalf("got error %v, want an error from the defaults mentioning the missing file", err)
 			}
 		})
 	}

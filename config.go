@@ -19,7 +19,12 @@ import (
 )
 
 // Load loads the CUE configuration at the file or CUE package directory
-// configFilePath. If the file does not exist, an os.IsNotExist error is returned.
+// configFilePath.
+//
+// If configFilePath does not exist, dest is still filled as if the
+// configuration were empty, and the returned error satisfies
+// errors.Is(err, [fs.ErrNotExist]). If applying the schema or defaults then
+// fails, that error is returned instead, mentioning the missing file.
 //
 // The schema for the user configuration is given in schema.
 // Usually this will come from a CUE file embedded in the binary by the caller.
@@ -38,27 +43,42 @@ import (
 // The result is unmarshaled into the Go value pointed to by dest
 // using cue.Value.Decode (similar to json.Unmarshal).
 func Load(configFilePath string, schema, defaults []byte, runtime any, dest any) error {
-	info, err := os.Stat(configFilePath)
-	if err != nil {
-		return err
-	}
-	return loadInstance(&load.Config{}, configFilePath, info, schema, defaults, runtime, dest)
+	return loadConfig(os.Stat, &load.Config{}, configFilePath, schema, defaults, runtime, dest)
 }
 
 // LoadFS is like [Load] but reads the configuration from fsys, such as an
 // [embed.FS], rather than from the host operating system filesystem.
 // configFilePath is a forward-slash-separated path within fsys.
 func LoadFS(fsys fs.FS, configFilePath string, schema, defaults []byte, runtime any, dest any) error {
-	info, err := fs.Stat(fsys, configFilePath)
+	stat := func(name string) (fs.FileInfo, error) { return fs.Stat(fsys, name) }
+	return loadConfig(stat, &load.Config{FS: fsys}, configFilePath, schema, defaults, runtime, dest)
+}
+
+// loadConfig holds the logic shared by [Load] and [LoadFS]; stat and cfg
+// carry the filesystem selection.
+func loadConfig(stat func(string) (fs.FileInfo, error), cfg *load.Config, configFilePath string, schema, defaults []byte, runtime any, dest any) error {
+	ctx := cuecontext.New()
+	info, statErr := stat(configFilePath)
+	if statErr != nil {
+		if !errors.Is(statErr, fs.ErrNotExist) {
+			return statErr
+		}
+		if err := apply(ctx, ctx.CompileString(""), schema, defaults, runtime, dest); err != nil {
+			// Mention the missing file without wrapping statErr,
+			// as a caller ignoring it would also ignore this failure.
+			return fmt.Errorf("%v (%v)", err, statErr)
+		}
+		return statErr
+	}
+	configVal, err := loadInstance(ctx, cfg, configFilePath, info)
 	if err != nil {
 		return err
 	}
-	return loadInstance(&load.Config{FS: fsys}, configFilePath, info, schema, defaults, runtime, dest)
+	return apply(ctx, configVal, schema, defaults, runtime, dest)
 }
 
-// loadInstance holds the logic shared by [Load] and [LoadFS]; cfg carries the
-// filesystem selection, if any.
-func loadInstance(cfg *load.Config, configFilePath string, info fs.FileInfo, schema, defaults []byte, runtime any, dest any) error {
+// loadInstance loads and validates the configuration at configFilePath.
+func loadInstance(ctx *cue.Context, cfg *load.Config, configFilePath string, info fs.FileInfo) (cue.Value, error) {
 	var configInst *build.Instance
 	if info.IsDir() {
 		cfg.Dir = configFilePath
@@ -67,15 +87,18 @@ func loadInstance(cfg *load.Config, configFilePath string, info fs.FileInfo, sch
 		configInst = load.Instances([]string{configFilePath}, cfg)[0]
 	}
 	if err := configInst.Err; err != nil {
-		return fmt.Errorf("cannot load configuration from %q: %v", configFilePath, err)
+		return cue.Value{}, fmt.Errorf("cannot load configuration from %q: %v", configFilePath, err)
 	}
-	ctx := cuecontext.New()
-
 	configVal := ctx.BuildInstance(configInst)
 	if err := configVal.Validate(cue.All()); err != nil {
-		return fmt.Errorf("invalid configuration from %q: %v", configFilePath, errors.Details(err, nil))
+		return cue.Value{}, fmt.Errorf("invalid configuration from %q: %v", configFilePath, errors.Details(err, nil))
 	}
+	return configVal, nil
+}
 
+// apply unifies configVal with the schema, runtime values and defaults,
+// and decodes the result into dest.
+func apply(ctx *cue.Context, configVal cue.Value, schema, defaults []byte, runtime any, dest any) error {
 	// Compile the config schema.
 	schemaVal := ctx.CompileBytes(schema, cue.Filename("$schema.cue"))
 	if err := schemaVal.Err(); err != nil {
